@@ -104,4 +104,4 @@ if st.button("🔮 **Predict Charging Load for a New Station**"):
 
 # ✅ Additional Information
 st.write("💡 Ask me anything related to EV Charging Load Prediction!")
-st.write(f"🔗 [Visit API]({API_URL})")  # Corrected API link
+st.write(f"🔗 [Visit API]({"https://ev-chatbot-project.onrender.com"})")  # Corrected API link
