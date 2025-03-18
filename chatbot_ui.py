@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 
 # ✅ Set API URL (Replace with your actual Render API URL)
-API_URL = "https://ev-chatbot-project-1.onrender.com"  # Replace with your actual Render URL
+API_URL = "https://ev-chatbot-project.onrender.com"  # Replace with your actual Render URL
 
 st.title("🔋 EV Charging Load Prediction Chatbot")
 
