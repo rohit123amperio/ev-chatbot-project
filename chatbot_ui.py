@@ -102,4 +102,6 @@ if st.button("🔮 **Predict Charging Load for a New Station**"):
     except Exception as e:
         st.error(f"❌ Failed to connect to API: {e}")
 
-st.write("💡 This prediction helps in selecting the best conditions for a new charging station.")
+# ✅ Additional Information
+st.write("💡 Ask me anything related to EV Charging Load Prediction!")
+st.write(f"🔗 [Visit API]({API_URL})")  # Corrected API link
