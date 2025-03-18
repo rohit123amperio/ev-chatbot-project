@@ -57,6 +57,25 @@ if st.button("🔮 Predict Charging Load for a New Station"):
             plt.xticks(rotation=45)
             st.pyplot(fig)
 
+            # ✅ Create a Table 📋
+            st.subheader("📅 Monthly Load Predictions")
+            df_table = df_future_top.copy()
+            df_table["Load (kW)"] = df_table["Load (kW)"].round(2)
+
+            # ✅ Identify best (lowest) and worst (highest) months
+            best_month = df_table.loc[df_table["Load (kW)"].idxmin()]
+            worst_month = df_table.loc[df_table["Load (kW)"].idxmax()]
+
+            # ✅ Highlight best & worst months
+            def highlight_months(row):
+                if row["Month"] == best_month["Month"]:
+                    return ["background-color: lightgreen"] * len(row)
+                elif row["Month"] == worst_month["Month"]:
+                    return ["background-color: lightcoral"] * len(row)
+                return [""] * len(row)
+
+            st.dataframe(df_table.style.apply(highlight_months, axis=1))
+
         else:
             st.error("⚠️ Error: Unexpected API response format.")
 
