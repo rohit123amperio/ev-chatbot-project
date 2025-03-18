@@ -51,4 +51,4 @@ if st.button("🔮 Predict Charging Load"):
 
 # ✅ Additional Information
 st.write("💡 Ask me anything related to EV Charging Load Prediction!")
-st.write("🔗 [Visit API](https://ev-chatbot-project-1.onrender.com) for API details.")  # Update with your API URL
+st.write("🔗 [Visit API](https://ev-chatbot-project.onrender.com) for API details.")  # Update with your API URL
