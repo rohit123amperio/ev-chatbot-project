@@ -49,9 +49,9 @@ if "category" not in st.session_state:
 # ✅ Step 1: Select Station Type
 if st.session_state.step == 1:
     st.subheader("⚡ Select Station Type:")
-    station_options = df_data["Station Type"].unique().tolist()
+    station_options = df_data["Station Type"].dropna().astype(str).unique().tolist()
     for option in station_options:
-        if st.button(option):
+        if st.button(str(option)):
             st.session_state.station_type = option
             st.session_state.step = 2
             st.experimental_rerun()
@@ -59,9 +59,10 @@ if st.session_state.step == 1:
 # ✅ Step 2: Select Charging Station Category
 elif st.session_state.step == 2:
     st.subheader("🏪 Select Charging Station Category:")
-    category_options = df_data["Category"].unique().tolist()
+    category_options = df_data["Category"].dropna().astype(str).unique().tolist()
+    
     for option in category_options:
-        if st.button(option):
+        if st.button(str(option)):  # Convert to string explicitly
             st.session_state.category = option
             st.session_state.step = 3
             st.experimental_rerun()
