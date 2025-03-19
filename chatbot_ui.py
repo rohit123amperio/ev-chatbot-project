@@ -5,10 +5,15 @@ import numpy as np
 import plotly.express as px
 
 # ✅ Set API URL (Replace with your actual API URL)
-API_URL = "https://ev-chatbot-project.onrender.com/chatbot"  # Replace with your actual Render API URL
+API_URL = "https://ev-chatbot-project.onrender.com/chatbot"  # Replace with your Render API URL
 
-# ✅ Load Processed Charging Station Data (Ensure this CSV is available)
-df_data = pd.read_csv("Processed_Stations.csv")  # This file must contain filtered data
+# ✅ Load Processed Charging Station Data
+try:
+    df_data = pd.read_csv("Processed_Stations.csv")  # Ensure this file exists in the same folder
+    df_data.columns = df_data.columns.str.strip()  # Remove unwanted spaces in column names
+except FileNotFoundError:
+    st.error("⚠️ Processed_Stations.csv file not found. Ensure it is in the correct location.")
+    st.stop()
 
 # 🎨 Custom Styling for UI
 st.markdown(
@@ -25,65 +30,63 @@ st.markdown(
 
 st.markdown('<p class="main-title">💬 EV Charging Load Chatbot 🚗⚡</p>', unsafe_allow_html=True)
 
-# ✅ Initialize session state for step-by-step interaction
+# ✅ Check Column Names
+required_columns = ["Station Name", "Address", "Station Type", "Category", "Charging Load (kW)", "Timestamp"]
+missing_columns = [col for col in required_columns if col not in df_data.columns]
+
+if missing_columns:
+    st.error(f"⚠️ Missing required columns in dataset: {missing_columns}. Please check your CSV file.")
+    st.stop()
+
+# ✅ Initialize session state for interactive question flow
 if "step" not in st.session_state:
     st.session_state.step = 1
-if "city" not in st.session_state:
-    st.session_state.city = None
 if "station_type" not in st.session_state:
     st.session_state.station_type = None
 if "category" not in st.session_state:
     st.session_state.category = None
 
-# ✅ Step 1: Ask for City
+# ✅ Step 1: Select Station Type
 if st.session_state.step == 1:
-    city_options = df_data["City"].unique().tolist()
-    city_choice = st.radio("📍 Select City:", city_options)
-    if st.button("Next"):
-        st.session_state.city = city_choice
-        st.session_state.step = 2
-        st.experimental_rerun()
-
-# ✅ Step 2: Ask for Station Type
-elif st.session_state.step == 2:
+    st.subheader("⚡ Select Station Type:")
     station_options = df_data["Station Type"].unique().tolist()
-    station_choice = st.radio("⚡ Select Station Type:", station_options)
-    if st.button("Next"):
-        st.session_state.station_type = station_choice
-        st.session_state.step = 3
-        st.experimental_rerun()
+    for option in station_options:
+        if st.button(option):
+            st.session_state.station_type = option
+            st.session_state.step = 2
+            st.experimental_rerun()
 
-# ✅ Step 3: Ask for Charging Station Category
-elif st.session_state.step == 3:
+# ✅ Step 2: Select Charging Station Category
+elif st.session_state.step == 2:
+    st.subheader("🏪 Select Charging Station Category:")
     category_options = df_data["Category"].unique().tolist()
-    category_choice = st.radio("🏪 Select Charging Station Category:", category_options)
-    if st.button("Get Prediction"):
-        st.session_state.category = category_choice
-        st.session_state.step = 4
-        st.experimental_rerun()
+    for option in category_options:
+        if st.button(option):
+            st.session_state.category = option
+            st.session_state.step = 3
+            st.experimental_rerun()
 
-# ✅ Step 4: Predict and Show Graphs
-elif st.session_state.step == 4:
+# ✅ Step 3: Predict and Show Graphs
+elif st.session_state.step == 3:
     # ✅ Filter Data Based on User Selections
     filtered_data = df_data[
-        (df_data["City"] == st.session_state.city) &
         (df_data["Station Type"] == st.session_state.station_type) &
         (df_data["Category"] == st.session_state.category)
     ]
 
     if filtered_data.empty:
-        st.error("⚠️ No data available for the selected criteria. Try a different combination.")
+        st.error("⚠️ No data available for the selected criteria. Try a different selection.")
     else:
         # ✅ Calculate More Accurate Prediction Based on Existing Data
-        avg_load = filtered_data["Load (kW)"].mean()
+        avg_load = filtered_data["Charging Load (kW)"].mean()
         st.success(f"🔋 **Predicted Load: {avg_load:.2f} kW**")
 
         # ✅ Generate Historical Data Based on the Filtered Data
-        months = pd.date_range(start="2023-01-01", periods=24, freq='M').strftime('%b-%Y')
+        months = pd.date_range(start="2023-01-01", periods=24, freq='ME').strftime('%b-%Y')
         historical_load = np.random.uniform(avg_load - 20, avg_load + 20, len(months))
 
         # ✅ Generate Future Predictions for New Station
-        future_months = pd.date_range(start="2025-01-01", periods=24, freq='M').strftime('%b-%Y')
+        future_months = pd.date_range(start="2025-01-01", periods=24, freq='ME').strftime('%b-%Y')
         future_load_top = np.random.uniform(avg_load, avg_load + 30, len(future_months))
         future_load_low = np.random.uniform(avg_load - 30, avg_load, len(future_months))
 
@@ -96,13 +99,13 @@ elif st.session_state.step == 4:
         })
 
         # ✅ Show Recorded Data Graph 📊
-        st.subheader(f"📊 Historical Load for {st.session_state.city} ({st.session_state.station_type})")
+        st.subheader(f"📊 Historical Load for {st.session_state.station_type}")
         fig_past = px.bar(df_past, x="Month", y="Load (kW)", color="Type",
-                          title=f"Historical Charging Load for {st.session_state.city}")
+                          title=f"Historical Charging Load for {st.session_state.station_type}")
         st.plotly_chart(fig_past)
 
         # ✅ Show Predicted Data Graph 📊 (Top & Low Conditions in one chart)
-        st.subheader(f"📊 Predicted Load for a New {st.session_state.station_type} Station in {st.session_state.city}")
+        st.subheader(f"📊 Predicted Load for a New {st.session_state.station_type} Station")
         fig_future = px.bar(df_future, x="Month", y=["Top Condition Load (kW)", "Low Condition Load (kW)"],
                             title=f"Future Charging Load Prediction",
                             barmode="group",  # Grouped bars for each month
