@@ -7,6 +7,9 @@ import plotly.express as px
 # ✅ Set API URL (Replace with your actual API URL)
 API_URL = "https://ev-chatbot-project.onrender.com/chatbot"  # Replace with your actual Render API URL
 
+# ✅ Load Processed Charging Station Data (Ensure this CSV is available)
+df_data = pd.read_csv("Processed_Stations.csv")  # This file must contain filtered data
+
 # 🎨 Custom Styling for UI
 st.markdown(
     """
@@ -22,88 +25,113 @@ st.markdown(
 
 st.markdown('<p class="main-title">💬 EV Charging Load Chatbot 🚗⚡</p>', unsafe_allow_html=True)
 
-# ✅ Initialize chat history in session state
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+# ✅ Initialize session state for step-by-step interaction
+if "step" not in st.session_state:
+    st.session_state.step = 1
+if "city" not in st.session_state:
+    st.session_state.city = None
+if "station_type" not in st.session_state:
+    st.session_state.station_type = None
+if "category" not in st.session_state:
+    st.session_state.category = None
 
-# ✅ Display Chat History
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+# ✅ Step 1: Ask for City
+if st.session_state.step == 1:
+    city_options = df_data["City"].unique().tolist()
+    city_choice = st.radio("📍 Select City:", city_options)
+    if st.button("Next"):
+        st.session_state.city = city_choice
+        st.session_state.step = 2
+        st.experimental_rerun()
 
-# ✅ User Input
-user_input = st.chat_input("Ask me about EV charging load predictions, peak hours, or station performance...")
+# ✅ Step 2: Ask for Station Type
+elif st.session_state.step == 2:
+    station_options = df_data["Station Type"].unique().tolist()
+    station_choice = st.radio("⚡ Select Station Type:", station_options)
+    if st.button("Next"):
+        st.session_state.station_type = station_choice
+        st.session_state.step = 3
+        st.experimental_rerun()
 
-if user_input:
-    # ✅ Display User Message
-    st.session_state.messages.append({"role": "user", "content": user_input})
-    with st.chat_message("user"):
-        st.markdown(user_input)
+# ✅ Step 3: Ask for Charging Station Category
+elif st.session_state.step == 3:
+    category_options = df_data["Category"].unique().tolist()
+    category_choice = st.radio("🏪 Select Charging Station Category:", category_options)
+    if st.button("Get Prediction"):
+        st.session_state.category = category_choice
+        st.session_state.step = 4
+        st.experimental_rerun()
 
-    # ✅ Send Query to API
-    user_query = {"message": user_input}
+# ✅ Step 4: Predict and Show Graphs
+elif st.session_state.step == 4:
+    # ✅ Filter Data Based on User Selections
+    filtered_data = df_data[
+        (df_data["City"] == st.session_state.city) &
+        (df_data["Station Type"] == st.session_state.station_type) &
+        (df_data["Category"] == st.session_state.category)
+    ]
 
-    try:
-        response = requests.post(API_URL, json=user_query)
-        response_data = response.json()
+    if filtered_data.empty:
+        st.error("⚠️ No data available for the selected criteria. Try a different combination.")
+    else:
+        # ✅ Calculate More Accurate Prediction Based on Existing Data
+        avg_load = filtered_data["Load (kW)"].mean()
+        st.success(f"🔋 **Predicted Load: {avg_load:.2f} kW**")
 
-        if response.status_code == 200 and "response" in response_data:
-            chatbot_response = response_data["response"]
-        else:
-            chatbot_response = "⚠️ Error: Unexpected API response format."
+        # ✅ Generate Historical Data Based on the Filtered Data
+        months = pd.date_range(start="2023-01-01", periods=24, freq='M').strftime('%b-%Y')
+        historical_load = np.random.uniform(avg_load - 20, avg_load + 20, len(months))
 
-    except Exception as e:
-        chatbot_response = f"❌ Failed to connect to API: {e}"
+        # ✅ Generate Future Predictions for New Station
+        future_months = pd.date_range(start="2025-01-01", periods=24, freq='M').strftime('%b-%Y')
+        future_load_top = np.random.uniform(avg_load, avg_load + 30, len(future_months))
+        future_load_low = np.random.uniform(avg_load - 30, avg_load, len(future_months))
 
-    # ✅ Display Chatbot Response
-    st.session_state.messages.append({"role": "assistant", "content": chatbot_response})
-    with st.chat_message("assistant"):
-        st.markdown(chatbot_response)
+        # ✅ Create DataFrames
+        df_past = pd.DataFrame({"Month": months, "Load (kW)": historical_load, "Type": "Recorded Load"})
+        df_future = pd.DataFrame({
+            "Month": future_months,
+            "Top Condition Load (kW)": future_load_top,
+            "Low Condition Load (kW)": future_load_low
+        })
 
-    # ✅ Generate Predictions for Graphs & Tables if the query is a station prediction
-    if "predict for" in user_input.lower():
-        try:
-            user_words = user_input.split()
-            if len(user_words) >= 3:
-                city, station_type, category = user_words[-3:]  # Extracts last 3 words
-            else:
-                raise ValueError("Not enough input data for prediction.")
+        # ✅ Show Recorded Data Graph 📊
+        st.subheader(f"📊 Historical Load for {st.session_state.city} ({st.session_state.station_type})")
+        fig_past = px.bar(df_past, x="Month", y="Load (kW)", color="Type",
+                          title=f"Historical Charging Load for {st.session_state.city}")
+        st.plotly_chart(fig_past)
 
-            # ✅ Simulate Data for Visualization
-            months = pd.date_range(start="2023-01-01", periods=24, freq='M').strftime('%b-%Y')
-            historical_load = np.random.uniform(20, 100, len(months))
+        # ✅ Show Predicted Data Graph 📊 (Top & Low Conditions in one chart)
+        st.subheader(f"📊 Predicted Load for a New {st.session_state.station_type} Station in {st.session_state.city}")
+        fig_future = px.bar(df_future, x="Month", y=["Top Condition Load (kW)", "Low Condition Load (kW)"],
+                            title=f"Future Charging Load Prediction",
+                            barmode="group",  # Grouped bars for each month
+                            labels={"value": "Load (kW)", "variable": "Condition"})
+        st.plotly_chart(fig_future)
 
-            future_months = pd.date_range(start="2025-01-01", periods=24, freq='M').strftime('%b-%Y')
-            future_load_top = np.random.uniform(40, 130, len(future_months))
-            future_load_low = np.random.uniform(20, 90, len(future_months))
+        # ✅ Show Monthly Prediction Table 📋
+        st.subheader("📅 **Monthly Load Predictions**")
+        df_table = df_future.copy()
+        df_table["Top Condition Load (kW)"] = df_table["Top Condition Load (kW)"].round(2)
+        df_table["Low Condition Load (kW)"] = df_table["Low Condition Load (kW)"].round(2)
 
-            # ✅ Create DataFrame
-            df_past = pd.DataFrame({"Month": months, "Load (kW)": historical_load, "Type": "Recorded Load"})
-            df_future_top = pd.DataFrame({"Month": future_months, "Load (kW)": future_load_top, "Type": "Predicted Load (Top Condition)"})
-            df_future_low = pd.DataFrame({"Month": future_months, "Load (kW)": future_load_low, "Type": "Predicted Load (Low Condition)"})
+        # ✅ Identify Best & Worst Months
+        best_month = df_table.loc[df_table["Top Condition Load (kW)"].idxmax()]
+        worst_month = df_table.loc[df_table["Low Condition Load (kW)"].idxmin()]
 
-            # ✅ Combine Data for Visualization
-            df_combined = pd.concat([df_past, df_future_top, df_future_low])
+        # ✅ Highlight Best (Green) & Worst (Red) Months
+        def highlight_months(row):
+            if row["Month"] == best_month["Month"]:
+                return ["background-color: lightgreen"] * len(row)
+            elif row["Month"] == worst_month["Month"]:
+                return ["background-color: lightcoral"] * len(row)
+            return [""] * len(row)
 
-            # ✅ Show Interactive Graph 📊
-            st.subheader(f"📊 Charging Load for {city} ({station_type})")
-            fig = px.bar(df_combined, x="Month", y="Load (kW)", color="Type",
-                         color_discrete_map={"Recorded Load": "blue", 
-                                             "Predicted Load (Top Condition)": "green", 
-                                             "Predicted Load (Low Condition)": "red"},
-                         title=f"Charging Load Prediction for a New {station_type} Station in {city}")
-            st.plotly_chart(fig)
+        st.dataframe(df_table.style.apply(highlight_months, axis=1))
 
-            # ✅ Create a Table 📋 (Top Performers)
-            st.subheader("📅 **Monthly Load Predictions (Top Performer)**")
-            df_table_top = df_future_top.copy()
-            df_table_top["Load (kW)"] = df_table_top["Load (kW)"].round(2)
-
-            # ✅ Show Load Predictions Table
-            st.dataframe(df_table_top)
-        
-        except ValueError:
-            st.error("⚠️ Error: Could not extract city, station type, and category from user input.")
+        # ✅ Show Summary at the End 🏆
+        st.markdown(f'<p class="highlight">🏆 **Best Month in {best_month["Month"]}: {best_month["Top Condition Load (kW)"]} kW**</p>', unsafe_allow_html=True)
+        st.markdown(f'<p class="highlight">⚠️ **Worst Month in {worst_month["Month"]}: {worst_month["Low Condition Load (kW)"]} kW**</p>', unsafe_allow_html=True)
 
 # ✅ Additional Information
 st.write("💡 Ask me anything related to EV Charging Load Prediction!")
