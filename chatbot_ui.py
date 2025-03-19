@@ -55,7 +55,7 @@ if st.session_state.step == 1:
     st.session_state.station_name = st.selectbox("Select a Station", station_options)
     if st.button("Next"):
         st.session_state.step = 2
-        st.experimental_rerun()
+        st.rerun()  # ✅ Fixed: Changed from st.experimental_rerun() to st.rerun()
 
 # ✅ Step 2: Select Station Type from Dropdown
 elif st.session_state.step == 2:
@@ -64,7 +64,7 @@ elif st.session_state.step == 2:
     st.session_state.station_type = st.selectbox("Select Station Type", station_options)
     if st.button("Next"):
         st.session_state.step = 3
-        st.experimental_rerun()
+        st.rerun()  # ✅ Fixed: Changed from st.experimental_rerun() to st.rerun()
 
 # ✅ Step 3: Select Charging Station Category from Dropdown
 elif st.session_state.step == 3:
@@ -73,7 +73,7 @@ elif st.session_state.step == 3:
     st.session_state.category = st.selectbox("Select Charging Station Category", category_options)
     if st.button("Get Prediction"):
         st.session_state.step = 4
-        st.experimental_rerun()
+        st.rerun()  # ✅ Fixed: Changed from st.experimental_rerun() to st.rerun()
 
 # ✅ Step 4: Predict and Show Graphs
 elif st.session_state.step == 4:
