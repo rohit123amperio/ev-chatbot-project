@@ -38,104 +38,63 @@ if missing_columns:
     st.error(f"⚠️ Missing required columns in dataset: {missing_columns}. Please check your CSV file.")
     st.stop()
 
-# ✅ Initialize session state for interactive question flow
-if "step" not in st.session_state:
-    st.session_state.step = 1
-if "station_type" not in st.session_state:
-    st.session_state.station_type = None
-if "category" not in st.session_state:
-    st.session_state.category = None
+# ✅ Select Station Type with Dropdown
+st.subheader("⚡ Select Station Type:")
+station_options = df_data["Station Type"].dropna().astype(str).unique().tolist()
+station_type = st.selectbox("Choose a Station Type", station_options)
 
-# ✅ Step 1: Select Station Type
-if st.session_state.step == 1:
-    st.subheader("⚡ Select Station Type:")
-    station_options = df_data["Station Type"].dropna().astype(str).unique().tolist()
-    for option in station_options:
-        if st.button(str(option)):
-            st.session_state.station_type = option
-            st.session_state.step = 2
-            st.experimental_rerun()
+# ✅ Select Charging Station Category with Dropdown
+st.subheader("🏪 Select Charging Station Category:")
+category_options = df_data[df_data["Station Type"] == station_type]["Category"].dropna().astype(str).unique().tolist()
+category = st.selectbox("Choose a Category", category_options)
 
-# ✅ Step 2: Select Charging Station Category
-elif st.session_state.step == 2:
-    st.subheader("🏪 Select Charging Station Category:")
-    category_options = df_data["Category"].dropna().astype(str).unique().tolist()
-    
-    for option in category_options:
-        if st.button(str(option)):  # Convert to string explicitly
-            st.session_state.category = option
-            st.session_state.step = 3
-            st.experimental_rerun()
+# ✅ Filter Data Based on User Selections
+filtered_data = df_data[(df_data["Station Type"] == station_type) & (df_data["Category"] == category)]
 
-# ✅ Step 3: Predict and Show Graphs
-elif st.session_state.step == 3:
-    # ✅ Filter Data Based on User Selections
-    filtered_data = df_data[
-        (df_data["Station Type"] == st.session_state.station_type) &
-        (df_data["Category"] == st.session_state.category)
-    ]
+if filtered_data.empty:
+    st.error("⚠️ No data available for the selected criteria. Try a different selection.")
+else:
+    # ✅ Calculate More Accurate Prediction Based on Existing Data
+    avg_load = filtered_data["Charging Load (kW)"].mean()
+    st.success(f"🔋 **Predicted Load: {avg_load:.2f} kW**")
 
-    if filtered_data.empty:
-        st.error("⚠️ No data available for the selected criteria. Try a different selection.")
-    else:
-        # ✅ Calculate More Accurate Prediction Based on Existing Data
-        avg_load = filtered_data["Charging Load (kW)"].mean()
-        st.success(f"🔋 **Predicted Load: {avg_load:.2f} kW**")
+    # ✅ Generate Historical Data Based on the Filtered Data
+    months = pd.date_range(start="2023-01-01", periods=24, freq='ME').strftime('%b-%Y')
+    historical_load = np.random.uniform(avg_load - 20, avg_load + 20, len(months))
 
-        # ✅ Generate Historical Data Based on the Filtered Data
-        months = pd.date_range(start="2023-01-01", periods=24, freq='ME').strftime('%b-%Y')
-        historical_load = np.random.uniform(avg_load - 20, avg_load + 20, len(months))
+    # ✅ Generate Future Predictions for New Station
+    future_months = pd.date_range(start="2025-01-01", periods=24, freq='ME').strftime('%b-%Y')
+    future_load_top = np.random.uniform(avg_load, avg_load + 30, len(future_months))
+    future_load_low = np.random.uniform(avg_load - 30, avg_load, len(future_months))
 
-        # ✅ Generate Future Predictions for New Station
-        future_months = pd.date_range(start="2025-01-01", periods=24, freq='ME').strftime('%b-%Y')
-        future_load_top = np.random.uniform(avg_load, avg_load + 30, len(future_months))
-        future_load_low = np.random.uniform(avg_load - 30, avg_load, len(future_months))
+    # ✅ Create DataFrames
+    df_past = pd.DataFrame({"Month": months, "Load (kW)": historical_load, "Type": "Recorded Load"})
+    df_future = pd.DataFrame({
+        "Month": future_months,
+        "Top Condition Load (kW)": future_load_top,
+        "Low Condition Load (kW)": future_load_low
+    })
 
-        # ✅ Create DataFrames
-        df_past = pd.DataFrame({"Month": months, "Load (kW)": historical_load, "Type": "Recorded Load"})
-        df_future = pd.DataFrame({
-            "Month": future_months,
-            "Top Condition Load (kW)": future_load_top,
-            "Low Condition Load (kW)": future_load_low
-        })
+    # ✅ Show Recorded Data Graph 📊
+    st.subheader(f"📊 Historical Load for {station_type}")
+    fig_past = px.bar(df_past, x="Month", y="Load (kW)", color="Type",
+                      title=f"Historical Charging Load for {station_type}")
+    st.plotly_chart(fig_past)
 
-        # ✅ Show Recorded Data Graph 📊
-        st.subheader(f"📊 Historical Load for {st.session_state.station_type}")
-        fig_past = px.bar(df_past, x="Month", y="Load (kW)", color="Type",
-                          title=f"Historical Charging Load for {st.session_state.station_type}")
-        st.plotly_chart(fig_past)
+    # ✅ Show Predicted Data Graph 📊 (Top & Low Conditions in one chart)
+    st.subheader(f"📊 Predicted Load for a New {station_type} Station")
+    fig_future = px.bar(df_future, x="Month", y=["Top Condition Load (kW)", "Low Condition Load (kW)"],
+                        title=f"Future Charging Load Prediction",
+                        barmode="group",  # Grouped bars for each month
+                        labels={"value": "Load (kW)", "variable": "Condition"})
+    st.plotly_chart(fig_future)
 
-        # ✅ Show Predicted Data Graph 📊 (Top & Low Conditions in one chart)
-        st.subheader(f"📊 Predicted Load for a New {st.session_state.station_type} Station")
-        fig_future = px.bar(df_future, x="Month", y=["Top Condition Load (kW)", "Low Condition Load (kW)"],
-                            title=f"Future Charging Load Prediction",
-                            barmode="group",  # Grouped bars for each month
-                            labels={"value": "Load (kW)", "variable": "Condition"})
-        st.plotly_chart(fig_future)
-
-        # ✅ Show Monthly Prediction Table 📋
-        st.subheader("📅 **Monthly Load Predictions**")
-        df_table = df_future.copy()
-        df_table["Top Condition Load (kW)"] = df_table["Top Condition Load (kW)"].round(2)
-        df_table["Low Condition Load (kW)"] = df_table["Low Condition Load (kW)"].round(2)
-
-        # ✅ Identify Best & Worst Months
-        best_month = df_table.loc[df_table["Top Condition Load (kW)"].idxmax()]
-        worst_month = df_table.loc[df_table["Low Condition Load (kW)"].idxmin()]
-
-        # ✅ Highlight Best (Green) & Worst (Red) Months
-        def highlight_months(row):
-            if row["Month"] == best_month["Month"]:
-                return ["background-color: lightgreen"] * len(row)
-            elif row["Month"] == worst_month["Month"]:
-                return ["background-color: lightcoral"] * len(row)
-            return [""] * len(row)
-
-        st.dataframe(df_table.style.apply(highlight_months, axis=1))
-
-        # ✅ Show Summary at the End 🏆
-        st.markdown(f'<p class="highlight">🏆 **Best Month in {best_month["Month"]}: {best_month["Top Condition Load (kW)"]} kW**</p>', unsafe_allow_html=True)
-        st.markdown(f'<p class="highlight">⚠️ **Worst Month in {worst_month["Month"]}: {worst_month["Low Condition Load (kW)"]} kW**</p>', unsafe_allow_html=True)
+    # ✅ Show Monthly Prediction Table 📋
+    st.subheader("📅 **Monthly Load Predictions**")
+    df_table = df_future.copy()
+    df_table["Top Condition Load (kW)"] = df_table["Top Condition Load (kW)"].round(2)
+    df_table["Low Condition Load (kW)"] = df_table["Low Condition Load (kW)"].round(2)
+    st.dataframe(df_table)
 
 # ✅ Additional Information
 st.write("💡 Ask me anything related to EV Charging Load Prediction!")
